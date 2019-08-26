@@ -72,10 +72,10 @@ public class Raytracer : MonoBehaviour {
 
         for (int x = 0; x < Screen.width; ++x) {
             for (int y = 0; y < Screen.height; ++y) {
-                float xNDC = 2 * (-1 + ((float) x / Screen.width));
-                float yNDC = 2 * (-1 + ((float) y / Screen.height));
+                float xNDC = 2 * (-0.5f + ((float) x / Screen.width));
+                float yNDC = 2 * (-0.5f + ((float) y / Screen.height));
 
-                var dir = new Vector3(xNDC, yNDC, zNear).normalized;
+                var dir = new Vector3(xNDC * unityCamera.aspect, yNDC, zNear).normalized;
                 var worldDir = camera.transform.TransformDirection(dir);
                 var ray = new Ray(camera.transform.position, worldDir);
 
