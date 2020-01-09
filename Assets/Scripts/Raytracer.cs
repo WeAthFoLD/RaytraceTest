@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine;
+using URandom = UnityEngine.Random;
 
-public class HitResult {
+public struct HitResult {
+    public bool isHit;
     public Vector3 pos;
     public Color color;
 }
@@ -22,12 +25,21 @@ public class Raytracer : MonoBehaviour {
 
     private Texture2D _texture;
 
+    private bool _realTime;
+
+    private float _renderTime;
+
     private void Awake() {
         Instance = this;
         _meshRenderer = GetComponent<MeshRenderer>();
         _meshRenderer.sharedMaterial = Instantiate(_meshRenderer.sharedMaterial);
 
         Debug.Log("Awake!");
+    }
+
+    private IEnumerator Start() {
+        yield return null;
+        RenderOnce();
     }
 
     public void Register(RTObject obj) {
@@ -38,7 +50,9 @@ public class Raytracer : MonoBehaviour {
         _objects.Remove(obj);
     }
 
-    void Update() {
+    private void RenderOnce() {
+        var now = DateTime.Now;
+
         // Adjust mesh scale
         var aspect = unityCamera.aspect;
         var nscl = transform.localScale;
@@ -65,32 +79,59 @@ public class Raytracer : MonoBehaviour {
 
         _texture.Apply();
 //        _meshRenderer.material = material;
+
+        var elapsed = DateTime.Now - now;
+        _renderTime = (float) elapsed.TotalMilliseconds;
+    }
+
+    private void Update() {
+        if (_realTime)
+            RenderOnce();
+    }
+
+    private void OnGUI() {
+        if (GUILayout.Button("Render")) {
+            RenderOnce();
+        }
+
+        _realTime = GUILayout.Toggle(_realTime, "Real Time");
+        GUILayout.Label("Render Time: " + _renderTime.ToString(CultureInfo.InvariantCulture) + " ms");
     }
 
     private void DoRaytrace() {
         float zNear = 1.0f / Mathf.Tan(Mathf.Deg2Rad * camera.fov / 2);
+        const int samplesPerPixel = 5;
 
-        for (int x = 0; x < Screen.width; ++x) {
-            for (int y = 0; y < Screen.height; ++y) {
-                float xNDC = 2 * (-0.5f + ((float) x / Screen.width));
-                float yNDC = 2 * (-0.5f + ((float) y / Screen.height));
+        var camTrans = camera.transform;
+        var camPos = camTrans.position;
+        var screenWidth = Screen.width;
+        var screenHeight = Screen.height;
+        var aspect = unityCamera.aspect;
+        for (int x = 0; x < screenWidth; ++x) {
+            for (int y = 0; y < screenHeight; ++y) {
+                Color accumulated = Color.black;
+                for (int s = 0; s < samplesPerPixel; ++s) {
+                    float xNDC = 2 * (-0.5f + ((x + URandom.value) / screenWidth));
+                    float yNDC = 2 * (-0.5f + ((y + URandom.value) / screenHeight));
 
-                var dir = new Vector3(xNDC * unityCamera.aspect, yNDC, zNear).normalized;
-                var worldDir = camera.transform.TransformDirection(dir);
-                var ray = new Ray(camera.transform.position, worldDir);
+                    var dir = new Vector3(xNDC * aspect, yNDC, zNear).normalized;
+                    var worldDir = camTrans.TransformDirection(dir);
+                    var ray = new Ray(camPos, worldDir);
 
-                var pixel = CalcPixel(ray);
-                _texture.SetPixel(x, y, pixel);
+                    accumulated += CalcPixel(ray);
+                }
+
+                _texture.SetPixel(x, y, accumulated / samplesPerPixel);
             }
         }
     }
 
     private Color CalcPixel(Ray ray) {
         float minDist = float.MaxValue;
-        HitResult hitResult = null;
+        HitResult hitResult = new HitResult();
         foreach (var obj in _objects) {
             var result = obj.TestHit(ray);
-            if (result != null) {
+            if (result.isHit) {
                 var distance = Vector3.Distance(result.pos, ray.origin);
                 if (distance < minDist) {
                     minDist = distance;
@@ -99,7 +140,7 @@ public class Raytracer : MonoBehaviour {
             }
         }
 
-        Color color = hitResult?.color ?? backgroundColor;
+        Color color = hitResult.isHit ? hitResult.color : backgroundColor;
         return color;
     }
 }
