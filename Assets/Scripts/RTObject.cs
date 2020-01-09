@@ -3,8 +3,9 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public abstract class RTObject : MonoBehaviour
-{
+public abstract class RTObject : MonoBehaviour {
+    public RTMaterial material;
+
     // protected virtual void OnEnable() {
     //     Debug.Log(this + " OnEnable");
     //     Raytracer.Instance.Register(this);

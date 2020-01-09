@@ -23,7 +23,8 @@ public class RTPlane : RTObject {
 		return new HitResult {
 			pos = ray.origin + t * ray.direction,
 			isHit = true,
-			normal = new Vector3(0, 1, 0)
+			normal = new Vector3(0, 1, 0),
+			material = material
 		};
 	}
 }

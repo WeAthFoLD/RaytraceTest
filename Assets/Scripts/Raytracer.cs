@@ -10,6 +10,8 @@ public struct HitResult {
     public bool isHit;
     public Vector3 pos;
     public Vector3 normal;
+
+    public RTMaterial material;
     // public Color color;
 
     public static HitResult Empty = new HitResult {isHit = false};
@@ -25,6 +27,8 @@ public class Raytracer : MonoBehaviour {
 
     public Color backgroundColor = Color.grey;
     public Color backgroundColor2 = Color.blue;
+
+    public int samplesPerPixel = 25;
 
     private MeshRenderer _meshRenderer;
 
@@ -107,7 +111,6 @@ public class Raytracer : MonoBehaviour {
 
     private void DoRaytrace() {
         float zNear = 1.0f / Mathf.Tan(Mathf.Deg2Rad * camera.fov / 2);
-        const int samplesPerPixel = 5;
 
         var camTrans = camera.transform;
         var camPos = camTrans.position;
@@ -160,16 +163,26 @@ public class Raytracer : MonoBehaviour {
             }
 
             if (hitResult.isHit) {
-                Vector3 target = hitResult.pos + hitResult.normal + URandom.insideUnitSphere;
-                return 0.5f * CalcPixel(
-                           new Ray(hitResult.pos + 0.001f * hitResult.normal, (target - hitResult.pos).normalized),
+                Vector3 diffuseFinalPos = hitResult.pos + hitResult.normal + URandom.insideUnitSphere;
+                Vector3 diffuseDir = (diffuseFinalPos - hitResult.pos).normalized;
+                Vector3 reflectedDir =
+                    ray.direction - 2 * Vector3.Dot(ray.direction, hitResult.normal) * hitResult.normal;
+                Vector3 finalDir = Vector3.Slerp(reflectedDir, diffuseDir, hitResult.material.roughness).normalized;
+
+                var nextColor = CalcPixel(
+                           new Ray(hitResult.pos + 0.001f * hitResult.normal, finalDir),
                            iteration + 1);
+                return ScaleColor(hitResult.material.albedoo, nextColor);
             }
             // return NormalToColor(hitResult.normal);
         }
 
         var t = 0.5f * (ray.direction.y + 1.0f);
         return Color.Lerp(backgroundColor, backgroundColor2, t);
+    }
+
+    private Color ScaleColor(Color lhs, Color rhs) {
+        return new Color(lhs.r * rhs.r, lhs.g * rhs.g, lhs.b * rhs.b, 1);
     }
 
     private Color NormalToColor(Vector3 normal) {
