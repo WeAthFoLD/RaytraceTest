@@ -28,13 +28,13 @@ public class RTSphere : RTObject {
                 if (det >= 0.0f) {
                      var hitPos = ray.origin + ray.direction * (-b - Mathf.Sqrt(det)) / (2.0f * a);
                      var normal = (hitPos - pos).normalized;
-                     var color = new Color(
-                         MathUtils.NDC2Unit(normal.x),
-                         MathUtils.NDC2Unit(normal.y),
-                         MathUtils.NDC2Unit(normal.z));
+                     // var color = new Color(
+                     //     MathUtils.NDC2Unit(normal.x),
+                     //     MathUtils.NDC2Unit(normal.y),
+                     //     MathUtils.NDC2Unit(normal.z));
 
                      return new HitResult {
-                         color = color,
+                         normal = normal,
                          pos = hitPos,
                          isHit = true
                      };

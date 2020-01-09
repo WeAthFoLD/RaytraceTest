@@ -91,6 +91,7 @@ MeshRenderer:
   m_ProbeAnchor: {fileID: 0}
   m_LightProbeVolumeOverride: {fileID: 0}
   m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
   m_PreserveUVs: 0
   m_IgnoreNormalsForChartDetection: 0
   m_ImportantGI: 0
@@ -125,7 +126,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   unityCamera: {fileID: 6971785868489957861}
   camera: {fileID: 6971785869631826577}
-  backgroundColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  backgroundColor: {r: 0.9339623, g: 0.89987427, b: 0.5242524, a: 1}
+  backgroundColor2: {r: 0.17697577, g: 0.8325718, b: 0.9150943, a: 1}
 --- !u!1 &6971785868489957863
 GameObject:
   m_ObjectHideFlags: 0

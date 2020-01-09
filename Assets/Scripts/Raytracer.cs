@@ -2,13 +2,17 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using UnityEngine;
 using URandom = UnityEngine.Random;
 
 public struct HitResult {
     public bool isHit;
     public Vector3 pos;
-    public Color color;
+    public Vector3 normal;
+    // public Color color;
+
+    public static HitResult Empty = new HitResult {isHit = false};
 }
 
 public class Raytracer : MonoBehaviour {
@@ -17,11 +21,14 @@ public class Raytracer : MonoBehaviour {
     public Camera unityCamera;
     public new RTCamera camera;
 
+    public GameObject sceneObject;
+
     public Color backgroundColor = Color.grey;
+    public Color backgroundColor2 = Color.blue;
 
     private MeshRenderer _meshRenderer;
 
-    private readonly List<RTObject> _objects = new List<RTObject>();
+    private List<RTObject> _objects;
 
     private Texture2D _texture;
 
@@ -33,8 +40,7 @@ public class Raytracer : MonoBehaviour {
         Instance = this;
         _meshRenderer = GetComponent<MeshRenderer>();
         _meshRenderer.sharedMaterial = Instantiate(_meshRenderer.sharedMaterial);
-
-        Debug.Log("Awake!");
+        _objects = sceneObject.GetComponentsInChildren<RTObject>().ToList();
     }
 
     private IEnumerator Start() {
@@ -43,6 +49,7 @@ public class Raytracer : MonoBehaviour {
     }
 
     public void Register(RTObject obj) {
+        Debug.Log("Register " + obj);
         _objects.Add(obj);
     }
 
@@ -121,26 +128,54 @@ public class Raytracer : MonoBehaviour {
                     accumulated += CalcPixel(ray);
                 }
 
-                _texture.SetPixel(x, y, accumulated / samplesPerPixel);
+                var finalColor = accumulated / samplesPerPixel;
+                finalColor.r = GammaCorrection(finalColor.r);
+                finalColor.g = GammaCorrection(finalColor.g);
+                finalColor.b = GammaCorrection(finalColor.b);
+
+                _texture.SetPixel(x, y, finalColor);
             }
         }
     }
 
-    private Color CalcPixel(Ray ray) {
-        float minDist = float.MaxValue;
-        HitResult hitResult = new HitResult();
-        foreach (var obj in _objects) {
-            var result = obj.TestHit(ray);
-            if (result.isHit) {
-                var distance = Vector3.Distance(result.pos, ray.origin);
-                if (distance < minDist) {
-                    minDist = distance;
-                    hitResult = result;
+    private const int MAX_ITERATION = 100;
+
+    private float GammaCorrection(float x) {
+        return Mathf.Sqrt(x);
+    }
+
+    private Color CalcPixel(Ray ray, int iteration = 0) {
+        if (iteration <= MAX_ITERATION) {
+            float minDist = float.MaxValue;
+            HitResult hitResult = new HitResult();
+            foreach (var obj in _objects) {
+                var result = obj.TestHit(ray);
+                if (result.isHit) {
+                    var distance = Vector3.Distance(result.pos, ray.origin);
+                    if (distance < minDist) {
+                        minDist = distance;
+                        hitResult = result;
+                    }
                 }
             }
+
+            if (hitResult.isHit) {
+                Vector3 target = hitResult.pos + hitResult.normal + URandom.insideUnitSphere;
+                return 0.5f * CalcPixel(
+                           new Ray(hitResult.pos + 0.001f * hitResult.normal, (target - hitResult.pos).normalized),
+                           iteration + 1);
+            }
+            // return NormalToColor(hitResult.normal);
         }
 
-        Color color = hitResult.isHit ? hitResult.color : backgroundColor;
-        return color;
+        var t = 0.5f * (ray.direction.y + 1.0f);
+        return Color.Lerp(backgroundColor, backgroundColor2, t);
+    }
+
+    private Color NormalToColor(Vector3 normal) {
+         return new Color(
+             MathUtils.NDC2Unit(normal.x),
+             MathUtils.NDC2Unit(normal.y),
+             MathUtils.NDC2Unit(normal.z));
     }
 }
