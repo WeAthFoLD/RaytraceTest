@@ -8,6 +8,7 @@ using URandom = UnityEngine.Random;
 
 public struct HitResult {
     public bool isHit;
+    public bool isExit; // 光线是否从当前物体内部退出 
     public Vector3 pos;
     public Vector3 normal;
 
@@ -29,6 +30,8 @@ public class Raytracer : MonoBehaviour {
     public Color backgroundColor2 = Color.blue;
 
     public int samplesPerPixel = 25;
+
+    public bool enableDebugUI = true;
 
     private MeshRenderer _meshRenderer;
 
@@ -101,6 +104,9 @@ public class Raytracer : MonoBehaviour {
     }
 
     private void OnGUI() {
+        if (!enableDebugUI)
+            return;
+        
         if (GUILayout.Button("Render")) {
             RenderOnce();
         }
@@ -128,7 +134,7 @@ public class Raytracer : MonoBehaviour {
                     var worldDir = camTrans.TransformDirection(dir);
                     var ray = new Ray(camPos, worldDir);
 
-                    accumulated += CalcPixel(ray);
+                    accumulated += CalcPixel(ray, 1.0f);
                 }
 
                 var finalColor = accumulated / samplesPerPixel;
@@ -141,13 +147,13 @@ public class Raytracer : MonoBehaviour {
         }
     }
 
-    private const int MAX_ITERATION = 100;
+    private const int MAX_ITERATION = 25;
 
     private float GammaCorrection(float x) {
         return Mathf.Sqrt(x);
     }
 
-    private Color CalcPixel(Ray ray, int iteration = 0) {
+    private Color CalcPixel(Ray ray, float refractIndex, int iteration = 0) {
         if (iteration <= MAX_ITERATION) {
             float minDist = float.MaxValue;
             HitResult hitResult = new HitResult();
@@ -163,20 +169,55 @@ public class Raytracer : MonoBehaviour {
             }
 
             if (hitResult.isHit) {
+                // 漫反射
                 Vector3 diffuseFinalPos = hitResult.pos + hitResult.normal + URandom.insideUnitSphere;
                 Vector3 diffuseDir = (diffuseFinalPos - hitResult.pos).normalized;
-                Vector3 reflectedDir =
-                    ray.direction - 2 * Vector3.Dot(ray.direction, hitResult.normal) * hitResult.normal;
-                Vector3 finalDir = Vector3.Slerp(reflectedDir, diffuseDir, hitResult.material.roughness).normalized;
 
-                var nextColor = CalcPixel(
-                           new Ray(hitResult.pos + 0.001f * hitResult.normal, finalDir),
-                           iteration + 1);
-                return ScaleColor(hitResult.material.albedoo, nextColor);
+                float cosTheta = Vector3.Dot(ray.direction, -hitResult.normal);
+                
+                // 计算折射，如果需要的话
+                bool hasRefracted = false;
+                Vector3 refractedDir = Vector3.zero;
+                if (hitResult.material.isDieletric) {
+                    var n = refractIndex;
+                    var n1 = hitResult.isExit ? 1 : hitResult.material.refractIndex;
+                    var refractRatio = n / n1;
+
+                    var cosTheta1Sq = 1 - (refractRatio * refractRatio) * (1 - cosTheta * cosTheta);
+                    // if (false) {
+                    if (cosTheta1Sq > 0) {
+                        hasRefracted = true;
+                        var sinTheta1 = Mathf.Sqrt(1 - cosTheta1Sq);
+                        // var sinTheta1 = Mathf.Sqrt(1 - cosTheta * cosTheta);
+                        refractedDir =
+                            -hitResult.normal * cosTheta + sinTheta1 * (ray.direction + hitResult.normal * cosTheta).normalized;
+                        // refractedDir = ray.direction;
+                        refractedDir = refractedDir.normalized;
+                    }
+                }
+
+                if (hasRefracted) {
+                    var nextColor = CalcPixel(new Ray(hitResult.pos + refractedDir * .0001f, 
+                            refractedDir),
+                        hitResult.isExit ? 1 : hitResult.material.refractIndex,
+                        iteration + 1);
+                    return ScaleColor(hitResult.material.albedoo, nextColor);
+                }
+                else {
+                    var reflectedDir =
+                        ray.direction + 2 * cosTheta * hitResult.normal;
+                    Vector3 finalDir = Vector3.Slerp(reflectedDir, diffuseDir, hitResult.material.roughness).normalized;
+                    var nextColor = CalcPixel(
+                               new Ray(hitResult.pos + 0.001f * hitResult.normal, finalDir),
+                               refractIndex,
+                               iteration + 1);
+                    return ScaleColor(hitResult.material.albedoo, nextColor);
+                }
             }
             // return NormalToColor(hitResult.normal);
         }
 
+        // 天空，写死的渐变
         var t = 0.5f * (ray.direction.y + 1.0f);
         return Color.Lerp(backgroundColor, backgroundColor2, t);
     }

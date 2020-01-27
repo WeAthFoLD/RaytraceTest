@@ -16,6 +16,7 @@ public class RTSphere : RTObject {
         var pos = _cachedPos;
         var ap = pos - ray.origin;
         var ax = Vector3.Dot(ray.direction, ap);
+        var isInside = ap.sqrMagnitude < radius * radius;
 
         if (ax > 0.0f) {
             var sqrMag = (ap - ax * ray.direction).sqrMagnitude;
@@ -26,14 +27,15 @@ public class RTSphere : RTObject {
 
                 var det = b * b - 4 * a * c;
                 if (det >= 0.0f) {
-                     var hitPos = ray.origin + ray.direction * (-b - Mathf.Sqrt(det)) / (2.0f * a);
+                     var hitPos = ray.origin + ray.direction * (-b + (isInside ? 1 : -1) * Mathf.Sqrt(det)) / (2.0f * a);
                      var normal = (hitPos - pos).normalized;
 
                      return new HitResult {
                          normal = normal,
                          pos = hitPos,
                          isHit = true,
-                         material = material
+                         material = material,
+                         isExit = isInside
                      };
                 }
             }
