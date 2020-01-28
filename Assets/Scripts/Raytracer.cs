@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using UnityEngine;
+using Random = System.Random;
 using URandom = UnityEngine.Random;
 
 public struct HitResult {
@@ -13,9 +14,7 @@ public struct HitResult {
     public Vector3 normal;
 
     public RTMaterial material;
-
     public RTObject obj;
-    // public Color color;
 
     public static HitResult Empty = new HitResult {isHit = false};
 }
@@ -32,6 +31,8 @@ public class Raytracer : MonoBehaviour {
     public Color backgroundColor2 = Color.blue;
 
     public int samplesPerPixel = 25;
+
+    public int maxIteration = 100;
 
     public bool enableDebugUI = true;
 
@@ -57,15 +58,6 @@ public class Raytracer : MonoBehaviour {
         RenderOnce();
     }
 
-    public void Register(RTObject obj) {
-        Debug.Log("Register " + obj);
-        _objects.Add(obj);
-    }
-
-    public void Unregister(RTObject obj) {
-        _objects.Remove(obj);
-    }
-
     private void RenderOnce() {
         var now = DateTime.Now;
 
@@ -86,7 +78,6 @@ public class Raytracer : MonoBehaviour {
             material.SetTexture("_MainTex", _texture);
 
             Debug.Log("Set Texture!" + _texture);
-//            _meshRenderer.sharedMaterial = material;
             _meshRenderer.sharedMaterials = new[] {material};
         }
 
@@ -94,7 +85,6 @@ public class Raytracer : MonoBehaviour {
         DoRaytrace();
 
         _texture.Apply();
-//        _meshRenderer.material = material;
 
         var elapsed = DateTime.Now - now;
         _renderTime = (float) elapsed.TotalMilliseconds;
@@ -149,14 +139,12 @@ public class Raytracer : MonoBehaviour {
         }
     }
 
-    private const int MAX_ITERATION = 100;
-
     private float GammaCorrection(float x) {
         return Mathf.Sqrt(x);
     }
 
     private Color CalcPixel(Ray ray, RTObject insideObject, int iteration = 0) {
-        if (iteration <= MAX_ITERATION) {
+        if (iteration <= maxIteration) {
             float minDist = float.MaxValue;
             HitResult hitResult = new HitResult();
             foreach (var obj in _objects) {
@@ -187,15 +175,17 @@ public class Raytracer : MonoBehaviour {
                     var refractRatio = n / n1;
 
                     var cosTheta1Sq = 1 - (refractRatio * refractRatio) * (1 - cosTheta * cosTheta);
-                    // if (false) {
                     if (cosTheta1Sq > 0) {
-                        hasRefracted = true;
-                        var sinTheta1 = Mathf.Sqrt(1 - cosTheta1Sq);
-                        // var sinTheta1 = Mathf.Sqrt(1 - cosTheta * cosTheta);
-                        refractedDir =
-                            -hitResult.normal * Mathf.Sqrt(cosTheta1Sq) + sinTheta1 * (ray.direction + hitResult.normal * cosTheta).normalized;
-                        // refractedDir = ray.direction;
-                        refractedDir = refractedDir.normalized;
+                        var refractProb = 1 - Schlick(cosTheta, n, n1);
+                        // var refractProb = 1;
+                        if (URandom.value < refractProb) {
+                            hasRefracted = true;
+                            var sinTheta1 = Mathf.Sqrt(1 - cosTheta1Sq);
+                            var cosTheta1 = Mathf.Sqrt(cosTheta1Sq);
+                            refractedDir =
+                                -hitResult.normal * cosTheta1 + sinTheta1 * (ray.direction + hitResult.normal * cosTheta).normalized;
+                            refractedDir = refractedDir.normalized;
+                        }
                     }
                 }
 
@@ -205,7 +195,6 @@ public class Raytracer : MonoBehaviour {
                         hitResult.isExit ? null : hitResult.obj,
                         iteration + 1);
                     return ScaleColor(hitResult.material.albedoo, nextColor);
-                    // return NormalToColor(hitResult.normal);
                 }
                 else {
                     // 漫反射
@@ -219,16 +208,20 @@ public class Raytracer : MonoBehaviour {
                                new Ray(hitResult.pos + 0.001f * hitResult.normal, finalDir),
                                insideObject,
                                iteration + 1);
-                    // return NormalToColor(hitResult.normal);
                     return ScaleColor(hitResult.material.albedoo, nextColor);
                 }
             }
-            // return NormalToColor(hitResult.normal);
         }
 
         // 天空，写死的渐变
         var t = 0.5f * (ray.direction.y + 1.0f);
         return Color.Lerp(backgroundColor, backgroundColor2, t);
+    }
+
+    private float Schlick(float cosine, float n1, float n2) {
+        float r0 = (n1 - n2) / (n1 + n2);
+        r0 = r0 * r0;
+        return r0 + (1 - r0) * Mathf.Pow(1 - cosine, 5);
     }
 
     private Color ScaleColor(Color lhs, Color rhs) {
