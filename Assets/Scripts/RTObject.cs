@@ -15,5 +15,5 @@ public abstract class RTObject : MonoBehaviour {
     //     Raytracer.Instance.Unregister(this);
     // }
 
-    public abstract HitResult TestHit(Ray ray);
+    public abstract HitResult TestHit(Ray ray, RTObject insideObject);
 }

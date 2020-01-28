@@ -13,6 +13,8 @@ public struct HitResult {
     public Vector3 normal;
 
     public RTMaterial material;
+
+    public RTObject obj;
     // public Color color;
 
     public static HitResult Empty = new HitResult {isHit = false};
@@ -134,7 +136,7 @@ public class Raytracer : MonoBehaviour {
                     var worldDir = camTrans.TransformDirection(dir);
                     var ray = new Ray(camPos, worldDir);
 
-                    accumulated += CalcPixel(ray, 1.0f);
+                    accumulated += CalcPixel(ray, null);
                 }
 
                 var finalColor = accumulated / samplesPerPixel;
@@ -147,18 +149,18 @@ public class Raytracer : MonoBehaviour {
         }
     }
 
-    private const int MAX_ITERATION = 25;
+    private const int MAX_ITERATION = 100;
 
     private float GammaCorrection(float x) {
         return Mathf.Sqrt(x);
     }
 
-    private Color CalcPixel(Ray ray, float refractIndex, int iteration = 0) {
+    private Color CalcPixel(Ray ray, RTObject insideObject, int iteration = 0) {
         if (iteration <= MAX_ITERATION) {
             float minDist = float.MaxValue;
             HitResult hitResult = new HitResult();
             foreach (var obj in _objects) {
-                var result = obj.TestHit(ray);
+                var result = obj.TestHit(ray, insideObject);
                 if (result.isHit) {
                     var distance = Vector3.Distance(result.pos, ray.origin);
                     if (distance < minDist) {
@@ -169,17 +171,18 @@ public class Raytracer : MonoBehaviour {
             }
 
             if (hitResult.isHit) {
-                // 漫反射
-                Vector3 diffuseFinalPos = hitResult.pos + hitResult.normal + URandom.insideUnitSphere;
-                Vector3 diffuseDir = (diffuseFinalPos - hitResult.pos).normalized;
-
                 float cosTheta = Vector3.Dot(ray.direction, -hitResult.normal);
                 
                 // 计算折射，如果需要的话
                 bool hasRefracted = false;
                 Vector3 refractedDir = Vector3.zero;
                 if (hitResult.material.isDieletric) {
-                    var n = refractIndex;
+                    if (cosTheta < 0) {
+                        hitResult.normal = -hitResult.normal;
+                        cosTheta = -cosTheta;
+                    }
+
+                    var n = insideObject ? insideObject.material.refractIndex : 1;
                     var n1 = hitResult.isExit ? 1 : hitResult.material.refractIndex;
                     var refractRatio = n / n1;
 
@@ -190,27 +193,33 @@ public class Raytracer : MonoBehaviour {
                         var sinTheta1 = Mathf.Sqrt(1 - cosTheta1Sq);
                         // var sinTheta1 = Mathf.Sqrt(1 - cosTheta * cosTheta);
                         refractedDir =
-                            -hitResult.normal * cosTheta + sinTheta1 * (ray.direction + hitResult.normal * cosTheta).normalized;
+                            -hitResult.normal * Mathf.Sqrt(cosTheta1Sq) + sinTheta1 * (ray.direction + hitResult.normal * cosTheta).normalized;
                         // refractedDir = ray.direction;
                         refractedDir = refractedDir.normalized;
                     }
                 }
 
                 if (hasRefracted) {
-                    var nextColor = CalcPixel(new Ray(hitResult.pos + refractedDir * .0001f, 
+                    var nextColor = CalcPixel(new Ray(hitResult.pos - hitResult.normal * .01f, 
                             refractedDir),
-                        hitResult.isExit ? 1 : hitResult.material.refractIndex,
+                        hitResult.isExit ? null : hitResult.obj,
                         iteration + 1);
                     return ScaleColor(hitResult.material.albedoo, nextColor);
+                    // return NormalToColor(hitResult.normal);
                 }
                 else {
+                    // 漫反射
+                    Vector3 diffuseFinalPos = hitResult.pos + hitResult.normal + URandom.insideUnitSphere;
+                    Vector3 diffuseDir = (diffuseFinalPos - hitResult.pos).normalized;
+
                     var reflectedDir =
                         ray.direction + 2 * cosTheta * hitResult.normal;
                     Vector3 finalDir = Vector3.Slerp(reflectedDir, diffuseDir, hitResult.material.roughness).normalized;
                     var nextColor = CalcPixel(
                                new Ray(hitResult.pos + 0.001f * hitResult.normal, finalDir),
-                               refractIndex,
+                               insideObject,
                                iteration + 1);
+                    // return NormalToColor(hitResult.normal);
                     return ScaleColor(hitResult.material.albedoo, nextColor);
                 }
             }

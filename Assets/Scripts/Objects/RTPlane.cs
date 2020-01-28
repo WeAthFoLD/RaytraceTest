@@ -9,7 +9,7 @@ public class RTPlane : RTObject {
 		_cachedY = transform.position.y;
 	}
 
-	public override HitResult TestHit(Ray ray) {
+	public override HitResult TestHit(Ray ray, RTObject insideObject) {
 		bool isOriginBelow = ray.origin.y < _cachedY;
 		bool isDirectionUp = ray.direction.y > 0;
 		if (isOriginBelow != isDirectionUp)
@@ -24,6 +24,7 @@ public class RTPlane : RTObject {
 			pos = ray.origin + t * ray.direction,
 			isHit = true,
 			normal = new Vector3(0, 1, 0),
+			obj = this,
 			material = material
 		};
 	}

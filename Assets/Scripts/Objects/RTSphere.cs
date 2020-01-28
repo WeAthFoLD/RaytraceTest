@@ -7,16 +7,18 @@ public class RTSphere : RTObject {
     public float radius;
 
     private Vector3 _cachedPos;
+    private float _cachedRadiusSq;
 
     private void Start() {
         _cachedPos = transform.position;
+        _cachedRadiusSq = (radius + .01f) * (radius + .01f);
     }
 
-    public override HitResult TestHit(Ray ray) {
+    public override HitResult TestHit(Ray ray, RTObject insideObject) {
         var pos = _cachedPos;
         var ap = pos - ray.origin;
         var ax = Vector3.Dot(ray.direction, ap);
-        var isInside = ap.sqrMagnitude < radius * radius;
+        var isInside = insideObject == this;
 
         if (ax > 0.0f) {
             var sqrMag = (ap - ax * ray.direction).sqrMagnitude;
@@ -31,10 +33,11 @@ public class RTSphere : RTObject {
                      var normal = (hitPos - pos).normalized;
 
                      return new HitResult {
-                         normal = normal,
+                         normal = isInside ? -normal : normal,
                          pos = hitPos,
                          isHit = true,
                          material = material,
+                         obj = this,
                          isExit = isInside
                      };
                 }

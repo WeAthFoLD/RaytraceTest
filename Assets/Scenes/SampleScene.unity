@@ -471,20 +471,5 @@ PrefabInstance:
       propertyPath: sceneObject
       value: 
       objectReference: {fileID: 1860959664}
-    - target: {fileID: 6971785868455213203, guid: 7b8b3e582df1e6941b50626f648490d9,
-        type: 3}
-      propertyPath: samplesPerPixel
-      value: 10
-      objectReference: {fileID: 0}
-    - target: {fileID: 6971785868455213203, guid: 7b8b3e582df1e6941b50626f648490d9,
-        type: 3}
-      propertyPath: enableDebugUI
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6971785868455213205, guid: 7b8b3e582df1e6941b50626f648490d9,
-        type: 3}
-      propertyPath: m_DynamicOccludee
-      value: 1
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 7b8b3e582df1e6941b50626f648490d9, type: 3}
